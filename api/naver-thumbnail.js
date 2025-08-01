@@ -1,3 +1,4 @@
+// naver-thumbnail.js
 const fetch = require("node-fetch");
 const cheerio = require("cheerio");
 
@@ -21,7 +22,7 @@ module.exports = async (req, res) => {
     const iframeSrc = $("#mainFrame").attr("src");
 
     if (!iframeSrc) {
-      return res.redirect("https://placehold.co/100x70?text=No+Iframe");
+      return res.json({ thumbnail: "https://placehold.co/100x70?text=No+Iframe" });
     }
 
     const iframeUrl = `https://blog.naver.com${iframeSrc}`;
@@ -40,10 +41,9 @@ module.exports = async (req, res) => {
       $$('meta[name="og:image"]').attr("content");
 
     if (ogImage) {
-      return res.redirect(ogImage);
+      return res.json({ thumbnail: ogImage });
     }
 
-    // og:image가 없다면 첫 번째 이미지 사용
     const imgSrcRaw = $$("img").first().attr("src");
     let imgSrc = "";
 
@@ -55,12 +55,12 @@ module.exports = async (req, res) => {
     }
 
     if (imgSrc) {
-      res.redirect(imgSrc);
+      return res.json({ thumbnail: imgSrc });
     } else {
-      res.redirect("https://placehold.co/100x70?text=No+Image");
+      return res.json({ thumbnail: "https://placehold.co/100x70?text=No+Image" });
     }
   } catch (err) {
     console.error(err.message);
-    res.redirect("https://placehold.co/100x70?text=Error");
+    return res.json({ thumbnail: "https://placehold.co/100x70?text=Error" });
   }
 };
