@@ -22,10 +22,10 @@ module.exports = async (req, res) => {
     if (imgSrc && imgSrc.startsWith("http")) {
       res.redirect(imgSrc);
     } else {
-      res.redirect("https://via.placeholder.com/100x70?text=No+Image");
+      res.redirect("https://placehold.co/100x70?text=No+Image");
     }
   } catch (err) {
     console.error(err.message);
-    res.redirect("https://via.placeholder.com/100x70?text=Error");
+    res.redirect("https://placehold.co/100x70?text=Error");
   }
 };
