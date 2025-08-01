@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
   const { url } = req.query;
 
   if (!url) {
-    return res.status(400).json({ error: "Missing 'url' query parameter" });
+    return res.status(400).send("Missing 'url' query parameter");
   }
 
   try {
@@ -31,7 +31,7 @@ module.exports = async (req, res) => {
     const iframeSrc = $("#mainFrame").attr("src");
 
     if (!iframeSrc) {
-      return res.json({ thumbnail: "https://placehold.co/100x70?text=No+Iframe" });
+      return fetchAndProxyImage("https://placehold.co/100x70?text=No+Iframe", res);
     }
 
     const iframeUrl = `https://blog.naver.com${iframeSrc}`;
@@ -46,12 +46,13 @@ module.exports = async (req, res) => {
     const iframeHtml = await iframeResponse.text();
     const $$ = cheerio.load(iframeHtml);
 
+    // 우선 og:image 추출
     const ogImage =
       $$('meta[property="og:image"]').attr("content") ||
       $$('meta[name="og:image"]').attr("content");
 
     if (ogImage) {
-      return res.json({ thumbnail: ogImage });
+      return fetchAndProxyImage(ogImage, res);
     }
 
     // og:image 없으면 첫 번째 이미지 추출
@@ -66,12 +67,33 @@ module.exports = async (req, res) => {
     }
 
     if (imgSrc) {
-      return res.json({ thumbnail: imgSrc });
+      return fetchAndProxyImage(imgSrc, res);
     } else {
-      return res.json({ thumbnail: "https://placehold.co/100x70?text=No+Image" });
+      return fetchAndProxyImage("https://placehold.co/100x70?text=No+Image", res);
     }
   } catch (err) {
     console.error(err.message);
-    return res.json({ thumbnail: "https://placehold.co/100x70?text=Error" });
+    return fetchAndProxyImage("https://placehold.co/100x70?text=Error", res);
   }
 };
+
+// ✅ 이미지 URL을 받아서 fetch 후 바이너리로 응답
+async function fetchAndProxyImage(imageUrl, res) {
+  try {
+    const imgRes = await fetch(imageUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://blog.naver.com", // 네이버 이미지 서버는 리퍼러 확인함
+      },
+    });
+
+    const contentType = imgRes.headers.get("content-type");
+    const buffer = await imgRes.buffer();
+
+    res.setHeader("Content-Type", contentType);
+    res.send(buffer);
+  } catch (err) {
+    console.error("이미지 프록시 에러:", err.message);
+    res.status(500).send("Image fetch error");
+  }
+}
