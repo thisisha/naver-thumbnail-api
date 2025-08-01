@@ -9,6 +9,7 @@ module.exports = async (req, res) => {
   }
 
   try {
+    // 1차 요청: 블로그 메인 페이지
     const response = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0",
@@ -17,21 +18,47 @@ module.exports = async (req, res) => {
 
     const html = await response.text();
     const $ = cheerio.load(html);
-    const imgSrcRaw = $("img").first().attr("src");
-let imgSrc = "";
+    const iframeSrc = $("#mainFrame").attr("src");
 
-if (imgSrcRaw) {
-  const parsedUrl = new URL(url); // 요청한 페이지 기준 origin 추출
-  imgSrc = imgSrcRaw.startsWith("http")
-    ? imgSrcRaw
-    : `${parsedUrl.origin}${imgSrcRaw.startsWith("/") ? "" : "/"}${imgSrcRaw}`;
-}
+    if (!iframeSrc) {
+      return res.redirect("https://placehold.co/100x70?text=No+Iframe");
+    }
 
-if (imgSrc) {
-  res.redirect(imgSrc);
-} else {
-  res.redirect("https://placehold.co/100x70?text=No+Image");
-}
+    const iframeUrl = `https://blog.naver.com${iframeSrc}`;
+
+    // 2차 요청: 실제 본문이 들어있는 iframe 내부
+    const iframeResponse = await fetch(iframeUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
+    });
+
+    const iframeHtml = await iframeResponse.text();
+    const $$ = cheerio.load(iframeHtml);
+    const ogImage =
+      $$('meta[property="og:image"]').attr("content") ||
+      $$('meta[name="og:image"]').attr("content");
+
+    if (ogImage) {
+      return res.redirect(ogImage);
+    }
+
+    // og:image가 없다면 첫 번째 이미지 사용
+    const imgSrcRaw = $$("img").first().attr("src");
+    let imgSrc = "";
+
+    if (imgSrcRaw) {
+      const parsedIframeUrl = new URL(iframeUrl);
+      imgSrc = imgSrcRaw.startsWith("http")
+        ? imgSrcRaw
+        : `${parsedIframeUrl.origin}${imgSrcRaw.startsWith("/") ? "" : "/"}${imgSrcRaw}`;
+    }
+
+    if (imgSrc) {
+      res.redirect(imgSrc);
+    } else {
+      res.redirect("https://placehold.co/100x70?text=No+Image");
+    }
   } catch (err) {
     console.error(err.message);
     res.redirect("https://placehold.co/100x70?text=Error");
