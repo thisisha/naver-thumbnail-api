@@ -1,8 +1,17 @@
-// naver-thumbnail.js
 const fetch = require("node-fetch");
 const cheerio = require("cheerio");
 
 module.exports = async (req, res) => {
+  // ✅ CORS 헤더 설정
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // ✅ OPTIONS 요청 사전 처리 (CORS 프리플라이트 대응)
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   const { url } = req.query;
 
   if (!url) {
@@ -36,6 +45,7 @@ module.exports = async (req, res) => {
 
     const iframeHtml = await iframeResponse.text();
     const $$ = cheerio.load(iframeHtml);
+
     const ogImage =
       $$('meta[property="og:image"]').attr("content") ||
       $$('meta[name="og:image"]').attr("content");
@@ -44,6 +54,7 @@ module.exports = async (req, res) => {
       return res.json({ thumbnail: ogImage });
     }
 
+    // og:image 없으면 첫 번째 이미지 추출
     const imgSrcRaw = $$("img").first().attr("src");
     let imgSrc = "";
 
