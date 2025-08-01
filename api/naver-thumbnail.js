@@ -1,7 +1,7 @@
-import fetch from 'node-fetch';
-import * as cheerio from 'cheerio';
+const fetch = require("node-fetch");
+const cheerio = require("cheerio");
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   const { url } = req.query;
 
   if (!url) {
@@ -28,4 +28,4 @@ export default async function handler(req, res) {
     console.error(err.message);
     res.redirect("https://via.placeholder.com/100x70?text=Error");
   }
-}
+};
