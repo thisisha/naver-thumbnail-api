@@ -26,7 +26,7 @@ module.exports = async (req, res) => {
 
     const iframeUrl = `https://blog.naver.com${iframeSrc}`;
 
-    // 2차 요청: 실제 본문이 들어있는 iframe 내부
+    // 2차 요청: iframe 내부 실제 본문
     const iframeResponse = await fetch(iframeUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0",
@@ -35,30 +35,35 @@ module.exports = async (req, res) => {
 
     const iframeHtml = await iframeResponse.text();
     const $$ = cheerio.load(iframeHtml);
-    const ogImage =
+
+    let imageUrl =
       $$('meta[property="og:image"]').attr("content") ||
-      $$('meta[name="og:image"]').attr("content");
+      $$('meta[name="og:image"]').attr("content") ||
+      $$("img").first().attr("src");
 
-    if (ogImage) {
-      return res.redirect(ogImage);
+    if (!imageUrl) {
+      return res.redirect("https://placehold.co/100x70?text=No+Image");
     }
 
-    // og:image가 없다면 첫 번째 이미지 사용
-    const imgSrcRaw = $$("img").first().attr("src");
-    let imgSrc = "";
-
-    if (imgSrcRaw) {
+    // 상대경로 처리
+    if (!imageUrl.startsWith("http")) {
       const parsedIframeUrl = new URL(iframeUrl);
-      imgSrc = imgSrcRaw.startsWith("http")
-        ? imgSrcRaw
-        : `${parsedIframeUrl.origin}${imgSrcRaw.startsWith("/") ? "" : "/"}${imgSrcRaw}`;
+      imageUrl = `${parsedIframeUrl.origin}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
     }
 
-    if (imgSrc) {
-      res.redirect(imgSrc);
-    } else {
-      res.redirect("https://placehold.co/100x70?text=No+Image");
+    // 이미지 직접 다운로드해서 프록시 전달
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
+    });
+
+    if (!imageResponse.ok) {
+      throw new Error("Image fetch failed");
     }
+
+    res.setHeader("Content-Type", imageResponse.headers.get("content-type") || "image/jpeg");
+    imageResponse.body.pipe(res); // 이미지 스트림 전송
   } catch (err) {
     console.error(err.message);
     res.redirect("https://placehold.co/100x70?text=Error");
