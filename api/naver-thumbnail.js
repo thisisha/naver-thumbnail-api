@@ -3,58 +3,64 @@ const cheerio = require("cheerio");
 
 module.exports = async (req, res) => {
   const { url } = req.query;
+
   if (!url) {
     return res.status(400).json({ error: "Missing 'url' query parameter" });
   }
 
   try {
+    // 1차 요청: 블로그 메인 페이지
     const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0" },
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
     });
 
     const html = await response.text();
     const $ = cheerio.load(html);
     const iframeSrc = $("#mainFrame").attr("src");
+
     if (!iframeSrc) {
       return res.redirect("https://placehold.co/100x70?text=No+Iframe");
     }
 
     const iframeUrl = `https://blog.naver.com${iframeSrc}`;
+
+    // 2차 요청: 실제 본문이 들어있는 iframe 내부
     const iframeResponse = await fetch(iframeUrl, {
-      headers: { "User-Agent": "Mozilla/5.0" },
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
     });
 
     const iframeHtml = await iframeResponse.text();
     const $$ = cheerio.load(iframeHtml);
-
-    let imageUrl =
+    const ogImage =
       $$('meta[property="og:image"]').attr("content") ||
-      $$('meta[name="og:image"]').attr("content") ||
-      $$("img").first().attr("src");
+      $$('meta[name="og:image"]').attr("content");
 
-    if (!imageUrl) {
-      return res.redirect("https://placehold.co/100x70?text=No+Image");
+    if (ogImage) {
+      return res.redirect(ogImage);
     }
 
-    if (!imageUrl.startsWith("http")) {
+    // og:image가 없다면 첫 번째 이미지 사용
+    const imgSrcRaw = $$("img").first().attr("src");
+    let imgSrc = "";
+
+    if (imgSrcRaw) {
       const parsedIframeUrl = new URL(iframeUrl);
-      imageUrl = `${parsedIframeUrl.origin}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
+      imgSrc = imgSrcRaw.startsWith("http")
+        ? imgSrcRaw
+        : `${parsedIframeUrl.origin}${imgSrcRaw.startsWith("/") ? "" : "/"}${imgSrcRaw}`;
     }
 
-    // 이미지 다운로드 후 버퍼로 읽어서 전송
-    const imageResponse = await fetch(imageUrl, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-    });
-
-    if (!imageResponse.ok) throw new Error("Image fetch failed");
-
-    const buffer = await imageResponse.buffer();
-    res.setHeader("Content-Type", imageResponse.headers.get("content-type") || "image/jpeg");
-    res.setHeader("Cache-Control", "public, max-age=86400"); // 하루 캐싱
-    res.send(buffer);
+    if (imgSrc) {
+      res.redirect(imgSrc);
+    } else {
+      res.redirect("https://placehold.co/100x70?text=No+Image");
+    }
   } catch (err) {
     console.error(err.message);
     res.redirect("https://placehold.co/100x70?text=Error");
   }
 };
-
