@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/naver-thumbnail.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/naver-thumbnail", "dest": "api/naver-thumbnail.js" }
+  ]
+}
