@@ -17,13 +17,21 @@ module.exports = async (req, res) => {
 
     const html = await response.text();
     const $ = cheerio.load(html);
-    const imgSrc = $("img").first().attr("src");
+    const imgSrcRaw = $("img").first().attr("src");
+let imgSrc = "";
 
-    if (imgSrc && imgSrc.startsWith("http")) {
-      res.redirect(imgSrc);
-    } else {
-      res.redirect("https://placehold.co/100x70?text=No+Image");
-    }
+if (imgSrcRaw) {
+  const parsedUrl = new URL(url); // 요청한 페이지 기준 origin 추출
+  imgSrc = imgSrcRaw.startsWith("http")
+    ? imgSrcRaw
+    : `${parsedUrl.origin}${imgSrcRaw.startsWith("/") ? "" : "/"}${imgSrcRaw}`;
+}
+
+if (imgSrc) {
+  res.redirect(imgSrc);
+} else {
+  res.redirect("https://placehold.co/100x70?text=No+Image");
+}
   } catch (err) {
     console.error(err.message);
     res.redirect("https://placehold.co/100x70?text=Error");
